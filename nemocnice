@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="cs">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nemocniční Kartotéka</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            color: #333;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        header {
+            background-color: #00796b;
+            color: white;
+            padding: 15px;
+            width: 100%;
+            text-align: center;
+        }
+
+        section {
+            margin: 20px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            background-color: #fff;
+            width: 80%;
+            max-width: 900px;
+        }
+
+        input,
+        textarea,
+        select {
+            width: 100%;
+            padding: 10px;
+            margin: 5px 0;
+            box-sizing: border-box;
+        }
+
+        button {
+            background-color: #00796b;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #004d40;
+        }
+
+        .patient-entry {
+            border-bottom: 1px solid #ddd;
+            padding: 10px;
+            margin-bottom: 10px;
+            position: relative;
+        }
+
+        .patient-entry:last-child {
+            border-bottom: none;
+        }
+
+        .folder-content {
+            display: none;
+            border-top: 1px solid #ddd;
+            padding-top: 10px;
+            margin-top: 10px;
+        }
+
+        .folder-content textarea {
+            margin-top: 10px;
+        }
+
+        .folder-content img {
+            max-width: 200px;
+            height: auto;
+            display: block;
+            margin-bottom: 10px;
+        }
+
+        .folder-content button {
+            background-color: #d32f2f;
+            margin-top: 10px;
+        }
+
+        .folder-content button:hover {
+            background-color: #b71c1c;
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <h1>Nemocniční Kartotéka</h1>
+    </header>
+
+    <section id="new-patient-form">
+        <h2>Přidat nového pacienta</h2>
+        <input type="text" id="patient-name" placeholder="Jméno a Příjmení" required>
+        <input type="text" id="patient-id" placeholder="Rodné číslo" required>
+        <input type="date" id="patient-dob" placeholder="Datum narození" required>
+        <textarea id="patient-diagnosis" placeholder="Diagnóza" required></textarea>
+        <button onclick="addPatient()">Přidat pacienta</button>
+    </section>
+
+    <section id="search-patient-form">
+        <h2>Vyhledat pacienta</h2>
+        <input type="text" id="search-query" placeholder="Hledat podle jména nebo ID">
+        <button onclick="searchPatients()">Vyhledat</button>
+    </section>
+
+    <section id="patient-list">
+        <h2>Seznam pacientů</h2>
+        <div id="patients"></div>
+    </section>
+
+    <script>
+        const patients = JSON.parse(localStorage.getItem('patients')) || [];
+
+        function savePatients() {
+            localStorage.setItem('patients', JSON.stringify(patients));
+        }
+
+        function addPatient() {
+            const name = document.getElementById('patient-name').value;
+            const id = document.getElementById('patient-id').value;
+            const dob = document.getElementById('patient-dob').value;
+            const diagnosis = document.getElementById('patient-diagnosis').value;
+
+            if (name && id && dob && diagnosis) {
+                const newPatient = {
+                    name,
+                    id,
+                    dob,
+                    diagnosis,
+                    photo: '',
+                    records: [],
+                    doctorSignature: ''
+                };
+                patients.push(newPatient);
+                savePatients();
+                displayPatients();
+                document.getElementById('patient-name').value = '';
+                document.getElementById('patient-id').value = '';
+                document.getElementById('patient-dob').value = '';
+                document.getElementById('patient-diagnosis').value = '';
+            } else {
+                alert('Vyplňte všechna pole.');
+            }
+        }
+
+        function displayPatients(filteredPatients = patients) {
+            const patientList = document.getElementById('patients');
+            patientList.innerHTML = '';
+            filteredPatients.forEach((patient, index) => {
+                const patientDiv = document.createElement('div');
+                patientDiv.className = 'patient-entry';
+                patientDiv.innerHTML = `
+                    <strong>${patient.name}</strong> - ${patient.id}
+                    <button onclick="openPatient(${index})">Otevřít</button>
+                    <button onclick="deletePatient(${index})">Smazat</button>
+                `;
+                patientList.appendChild(patientDiv);
+            });
+        }
+
+        function openPatient(index) {
+            const patient = patients[index];
+            const folderContent = document.createElement('div');
+            folderContent.className = 'folder-content';
+            folderContent.innerHTML = `
+                <h3>${patient.name} (Rodné číslo: ${patient.id})</h3>
+                <p><strong>Datum narození:</strong> ${patient.dob}</p>
+                <p><strong>Diagnóza:</strong> ${patient.diagnosis}</p>
+                <img src="${patient.photo}" alt="Fotka pacienta" id="patient-photo-${index}">
+                <textarea placeholder="Přidejte nové záznamy...">${patient.records.join('\n')}</textarea>
+                <input type="text" placeholder="Podpis lékaře" value="${patient.doctorSignature}" id="doctor-signature-${index}">
+                <button onclick="savePatient(${index})">Uložit</button>
+                <input type="file" accept="image/*" onchange="updatePhoto(${index}, event)">
+            `;
+            const patientEntry = document.querySelectorAll('.patient-entry')[index];
+            patientEntry.appendChild(folderContent);
+            folderContent.style.display = 'block';
+        }
+
+        function savePatient(index) {
+            const textarea = document.querySelectorAll('.folder-content textarea')[index];
+            const doctorSignature = document.getElementById(`doctor-signature-${index}`).value;
+            patients[index].records = textarea.value.split('\n').slice(0, 10); // Max 10 záznamů
+            patients[index].doctorSignature = doctorSignature;
+            savePatients();
+            alert('Záznamy byly uloženy.');
+        }
+
+        function updatePhoto(index, event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function (e) {
+                    patients[index].photo = e.target.result;
+                    savePatients();
+                    document.getElementById(`patient-photo-${index}`).src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        function searchPatients() {
+            const query = document.getElementById('search-query').value.toLowerCase();
+            const filteredPatients = patients.filter(patient =>
+                patient.name.toLowerCase().includes(query) || patient.id.includes(query)
+            );
+            displayPatients(filteredPatients);
+        }
+
+        function deletePatient(index) {
+            if (confirm('Opravdu chcete smazat tuto složku pacienta?')) {
+                patients.splice(index, 1);
+                savePatients();
+                displayPatients();
+            }
+        }
+
+        displayPatients();
+    </script>
+</body>
+
+</html>
